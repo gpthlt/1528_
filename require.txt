@@ -1,0 +1,40 @@
+Using Random Forest to Predict Student Performance
+Project Requirements
+Your project (from one of topics above) must include the following components.
+1. Real-World Problem Introduction
+•	Clearly describe a practical problem from industry, science, or everyday life.
+•	Explain why the problem is important and what challenges it poses.
+•	Provide enough context for readers unfamiliar with the domain.
+2. Algorithm Introduction
+•	Introduce the algorithm your group selects (for example: Dijkstra’s Algorithm, Binary Search Tree, Dynamic Programming, KMP, Kruskal, Segment Tree, Greedy strategy, etc.).
+•	Describe its purpose, structure, and core idea.
+•	Present any known theoretical properties such as time complexity, space complexity, and design paradigm.
+3. How the Algorithm Solves the Problem
+•	Explain step-by-step how the chosen algorithm can be applied to the real-world problem.
+•	Justify why this algorithm is suitable for the problem.
+•	Highlight advantages such as efficiency, optimality, correctness, or simplicity.
+•	If relevant, compare briefly with alternative algorithms and explain why they are less suitable.
+4. Future Work
+•	Discuss possible improvements or extensions of your solution.
+•	Mention limitations of the algorithm or implementation.
+•	Suggest directions for further research or real-world deployment.
+________________________________________
+. Final Report
+•	A written report that provides a complete and well-organized description of your project.
+•	The report should include motivation, problem statement, algorithm explanation, analysis, experiments (if any), results, future work, and references.
+
+Final Report and Code
+The final report must provide a complete and organized description of your project. The evaluation will consider the following:
+•	Clear motivation for the project and explanation of the real-world problem
+•	Description of the algorithm used, including theoretical background
+•	Explanation of how the algorithm solves the chosen problem and justification for choosing this algorithm
+•	Implementation details, including data structures, logic, and code design
+•	Presentation of results or demonstration outputs
+•	Analysis and discussion of the results
+•	Future work and potential improvements
+•	References
+
+
+Report Part A (Intro, Problem Definition & Algorithm Theory).
+Report Part B (Application of Algorithm, Results & Future Work).
+
