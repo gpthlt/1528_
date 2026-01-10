@@ -9,6 +9,7 @@
 Mỗi học kỳ, giáo viên thường nhận ra các dấu hiệu cảnh báo của học sinh gặp khó khăn quá muộn. Khi điểm cuối kỳ được công bố, thời gian can thiệp đã hết. Theo thống kê, tỷ lệ học sinh trượt môn ở các trường đại học dao động từ 15-25%, trong đó nhiều trường hợp có thể ngăn chặn nếu phát hiện sớm.
 
 **Thách thức hiện tại**:
+
 - Giáo viên quản lý 100-150 học sinh, không thể theo dõi sát từng cá nhân
 - Hệ thống cảnh báo truyền thống chỉ kích hoạt sau điểm giữa kỳ (tuần 8-10), khi học sinh đã tụt lại quá xa
 - Thiếu công cụ đánh giá khách quan, hệ thống nguy cơ trượt môn
@@ -22,6 +23,7 @@ Machine Learning cho phép phân tích hàng nghìn dữ liệu điểm sinh vi�
 **Mục tiêu chính**: Xây dựng mô hình Random Forest dự đoán khả năng Pass/Fail của sinh viên với độ chính xác ≥85%, dựa trên dữ liệu có sẵn trong 2-3 tuần đầu học kỳ.
 
 **Mục tiêu cụ thể**:
+
 1. Thu thập và phân tích dataset 2,500+ sinh viên với 13 features
 2. Xây dựng pipeline tiền xử lý dữ liệu chuẩn
 3. Tối ưu hóa Random Forest bằng Grid Search Cross-Validation
@@ -34,29 +36,35 @@ Machine Learning cho phép phân tích hàng nghìn dữ liệu điểm sinh vi�
 Model dự đoán dựa trên **13 features** phân thành 5 nhóm:
 
 **Nhóm 1: Học tập (Academic)**
+
 - `GPA`: Điểm trung bình tích lũy trước đó (0.0-4.0)
 - `StudyTimeWeekly`: Số giờ tự học mỗi tuần (0-40 giờ)
 
 **Nhóm 2: Hành vi (Behavioral)**
+
 - `Absences`: Số buổi vắng mặt trong học kỳ (0-30 buổi)
 
 **Nhóm 3: Hỗ trợ (Support)**
+
 - `ParentalEducation`: Trình độ học vấn phụ huynh (0-5: none, high school, some college, bachelor's, master's, doctorate)
 - `ParentalSupport`: Mức độ hỗ trợ của phụ huynh (categorical)
 - `Tutoring`: Có tham gia gia sư hay không (Yes/No)
 
 **Nhóm 4: Hoạt động ngoại khóa (Extracurricular)**
+
 - `Sports`: Tham gia thể thao (Yes/No)
 - `Music`: Tham gia âm nhạc (Yes/No)
 - `Extracurricular`: Hoạt động ngoại khóa khác (Yes/No)
 - `Volunteering`: Hoạt động tình nguyện (Yes/No)
 
 **Nhóm 5: Nhân khẩu học (Demographics)**
+
 - `Age`: Tuổi (15-22)
 - `Gender`: Giới tính (Male/Female)
 - `Ethnicity`: Dân tộc (Group A-E)
 
 **Lý do chọn features**:
+
 - **GPA**: Predictor mạnh nhất theo literature review, phản ánh ability và work ethic
 - **StudyTimeWeekly & Absences**: Modifiable behaviors, có thể can thiệp trực tiếp
 - **Parental factors**: Proxy cho home support environment và socioeconomic status
@@ -80,7 +88,69 @@ Pipeline triển khai trong notebook gồm 6 bước chính:
 
 Để dễ tái lập, báo cáo này đính kèm các đoạn code minh hoạ tương ứng với từng bước. Các đoạn code là phiên bản rút gọn (nhưng chạy được) và giữ logic giống notebook.
 
-### 2.1 Dữ liệu
+### 2.1 Random Forest: Algorithm Overview and Theoretical Background
+
+Random Forest is an ensemble classification (and regression) algorithm that combines the outputs of multiple decision trees to obtain a predictor with improved generalization. From an algorithmic perspective, it is best understood as a systematic way to construct a collection of diverse tree-structured hypothesis functions and to aggregate them via a stable voting rule. The design explicitly targets two classical sources of generalization error—variance and model instability—while retaining the expressive power of non-linear decision boundaries.
+
+#### 2.1.1 Core Idea of Random Forest
+
+The central intuition of ensemble learning is that a committee of imperfect predictors can outperform any single member when their errors are not perfectly correlated. In many learning problems, a single decision tree has low bias (it can fit complex decision boundaries) but high variance: small perturbations in the training set can produce substantially different tree structures and predictions. Random Forest addresses this instability by training many trees under randomized perturbations and then averaging their decisions.
+
+Combining multiple decision trees improves generalization primarily through variance reduction. Consider each tree as a random variable induced by sampling randomness (and feature randomness). If individual trees have similar accuracy but make partially independent errors, then aggregating by majority vote reduces the probability of an incorrect final decision. In the idealized setting of independent voters, the error probability decays exponentially with the number of trees. In practice, independence is not achieved, but even moderate de-correlation among trees yields a substantial improvement over a single tree.
+
+#### 2.1.2 Algorithm Structure
+
+A Random Forest is composed of $T$ decision trees. Each tree is a rooted, directed structure of internal decision nodes and leaf nodes. An internal node contains a splitting rule of the form “if $x_j \le \theta$ go left, else go right” for a numerical feature, or an analogous partition for categorical features. Recursively applying splits partitions the feature space into regions; each leaf corresponds to one region and stores a class label (or class distribution) used to predict examples that fall into that region.
+
+The defining structural constraint of Random Forest is the randomized choice of candidate features at each split. Rather than evaluating all $p$ input features when choosing the best split at a node, the algorithm samples a subset of $m$ features (often denoted $m_{\text{try}}$) and searches for the best split only within this subset. This “random subspace” mechanism has two algorithmic effects: (i) it reduces the correlation among trees by preventing the same dominant features from being selected at the top of every tree, and (ii) it reduces the computational cost per split when $m \ll p$. The combination of tree heterogeneity and efficient split search is central to why Random Forest scales effectively.
+
+#### 2.1.3 Training and Prediction Mechanism
+
+Training proceeds by building each tree on a bootstrap sample of the training set, while injecting feature randomness at each internal node. Conceptually, the process can be described as follows.
+
+First, for tree $t \in \{1,\dots,T\}$, a bootstrap sample of size $n$ is drawn uniformly with replacement from the original $n$ training instances. This resampling step ensures that different trees see different empirical distributions, including repeated instances and omitted instances, creating diversity in fitted structures.
+
+Second, the tree is grown recursively. At each node, the algorithm samples $m$ candidate features from the full set of $p$ features. For each candidate feature, it considers a set of possible split points (thresholds or category partitions) and evaluates an impurity criterion (e.g., Gini impurity or entropy) to select the split that produces the greatest reduction in impurity. The recursion continues until a stopping condition is met, such as reaching a maximum depth, having too few samples in a node, or achieving pure leaves.
+
+Third, the leaf prediction is determined by the class composition of the training instances that fall into the leaf region. For classification, this is typically the majority class within that leaf.
+
+For prediction, an input instance is routed from the root to a leaf in each tree according to the stored splitting rules. Each tree outputs a class label (or class probability estimate derived from leaf frequencies). The forest aggregates these outputs using majority voting for classification:
+
+$$
+\hat{y}(x) = \arg\max_{c} \sum_{t=1}^{T} \mathbb{1}\{h_t(x)=c\},
+$$
+
+where $h_t$ is the prediction of tree $t$ and $c$ ranges over classes. Voting acts as a discrete averaging operator that stabilizes predictions and mitigates the impact of any single overfitted tree.
+
+#### 2.1.4 Theoretical Properties
+
+**Time complexity (training).** Let $n$ be the number of training instances, $p$ the number of features, $m$ the number of randomly selected features per split, $T$ the number of trees, and $h$ the (average) depth of a tree. Building one decision tree involves evaluating splits at each node. For balanced trees, the total work across levels is often summarized as $O(m\,n\,\log n)$ under typical split-search implementations, since each level partitions the data and the number of levels is $O(\log n)$. Consequently, training a forest is approximately $O(T\,m\,n\,\log n)$. In worst-case degenerate trees (highly unbalanced partitions), depth can be $O(n)$, yielding a pessimistic upper bound closer to $O(T\,m\,n^2)$, though such behavior is mitigated by practical stopping rules.
+
+**Time complexity (prediction).** Predicting a single instance requires traversing $h$ nodes per tree, so the cost is $O(T\,h)$. With approximately balanced trees, $h=O(\log n)$, leading to $O(T\,\log n)$ per instance.
+
+**Space complexity.** The memory footprint is dominated by storing $T$ trees. If each tree contains $N_{\text{nodes}}$ nodes, total space is $O(T\,N_{\text{nodes}})$. For binary trees, $N_{\text{nodes}}$ is $O(n)$ in the worst case (since each split must allocate nodes and leaves), so a coarse upper bound is $O(T\,n)$, with smaller usage under depth constraints and minimum-leaf-size constraints.
+
+**Bias–variance trade-off.** Single deep trees typically exhibit low bias and high variance. Bagging reduces variance by averaging across bootstrap-induced perturbations, and random feature selection further reduces variance by decreasing inter-tree correlation. This may slightly increase bias compared to an unconstrained single tree, but the net generalization error often decreases because the variance reduction dominates.
+
+**Robustness to noise and overfitting.** While individual trees can overfit noise, aggregation yields robustness: noisy splits and spurious patterns are less likely to be consistently selected across many randomized trees, so their influence is diluted by voting. Random Forest is also relatively insensitive to monotonic transformations of numeric features and can handle heterogeneous feature types. Nonetheless, in extremely noisy settings or with overly strong trees and insufficient randomness, overfitting may still occur; the algorithm’s safeguards are statistical (variance reduction and de-correlation) rather than a guarantee of perfect generalization.
+
+#### 2.1.5 Design Paradigm
+
+Random Forest exemplifies the ensemble learning paradigm, where the algorithm’s output is a composition of multiple base learners. More specifically, it operationalizes bagging (Bootstrap Aggregating): training data are repeatedly resampled, independent models are trained on these resamples, and predictions are aggregated. Bagging can be viewed as an algorithmic stability technique—small changes in the training set lead to different models, but the aggregated predictor is less sensitive to any single sample.
+
+There is also a conceptual connection to divide-and-conquer strategies. A decision tree recursively divides the input space into smaller subproblems via splitting rules; each leaf “conquers” a region with a local decision. A Random Forest extends this by running multiple divide-and-conquer decompositions in parallel (via bootstrap and random subspaces) and then combining their solutions by voting. The final classifier is therefore a consensus over many hierarchical decompositions, making it more stable than relying on one decomposition.
+
+#### 2.1.6 Comparison with Alternative Algorithms
+
+Logistic Regression is a linear classifier that models class probabilities through a linear decision boundary in feature space. Its main strengths are interpretability and efficiency, but it is limited when the true relationship is strongly non-linear or involves complex interactions unless engineered features are introduced. Random Forest, in contrast, naturally captures non-linear boundaries and feature interactions through hierarchical splits, often without explicit feature construction.
+
+Support Vector Machines (SVM) can model non-linear decision boundaries via kernel functions and can be highly effective in medium-sized, well-conditioned datasets. However, kernel selection and parameter tuning are critical, and training may become computationally expensive as the number of instances grows. Random Forest typically offers a more direct scalability path through independent tree construction and can be less sensitive to the specific geometry required by a particular kernel.
+
+k-Nearest Neighbors (kNN) is an instance-based method that defers computation to prediction time. It can represent complex class boundaries, but prediction requires distance computations to many training points and can degrade in high-dimensional spaces due to distance concentration. Random Forest provides fast prediction once trained and tends to be more resilient to irrelevant features because split selection can ignore uninformative dimensions.
+
+Compared with a single Decision Tree, Random Forest retains the interpretability of tree-based partitioning at the component level while addressing a single tree’s primary weakness: high variance and sensitivity to sampling noise. For educational performance prediction tasks in general—where relationships can be non-linear, measurements can be noisy, and behavioral factors can interact—Random Forest is often more suitable because it combines expressive non-linear modeling with an algorithmic mechanism (bagging plus random subspaces) that stabilizes the learned decision function.
+
+### 2.2 Dữ liệu
 
 **Dataset**: 2,392 sinh viên (sau khi loại trùng)
 
@@ -89,7 +159,7 @@ Pipeline triển khai trong notebook gồm 6 bước chính:
 
 **Tiêu chí phân loại**: GradeClass ≤ 1.5 → Fail; GradeClass > 1.5 → Pass
 
-#### 2.1.1 Code minh hoạ: Load dữ liệu
+#### 2.2.1 Code minh hoạ: Load dữ liệu
 
 ```python
 import pandas as pd
@@ -101,9 +171,10 @@ print(df.head())
 ```
 
 **Kết quả thực tế**:
+
 - Dataset shape (sau loại trùng): `(2392, 16)`
 
-#### 2.1.2 Phân bố lớp (Pass/Fail)
+#### 2.2.2 Phân bố lớp (Pass/Fail)
 
 ```python
 import numpy as np
@@ -113,6 +184,7 @@ print(df["Results"].value_counts())
 ```
 
 **Kết quả thực tế**:
+
 - Pass: 2016 (84.3%)
 - Fail: 376 (15.7%)
 
@@ -120,7 +192,7 @@ print(df["Results"].value_counts())
 
 > Nếu bạn muốn ảnh có font/size đúng chuẩn báo cáo, bạn có thể thay đổi `figsize` và `dpi` khi export.
 
-### 2.2 Tiền xử lý
+### 2.3 Tiền xử lý
 
 1. **Xóa trùng lặp**: Đảm bảo mỗi sinh viên xuất hiện một lần
 2. **Chuẩn hóa tên cột**: Thống nhất định dạng
@@ -129,7 +201,7 @@ print(df["Results"].value_counts())
 5. **Scaling numerical**: StandardScaler cho Age, StudyTimeWeekly, Absences, GPA
 6. **Loại bỏ data leakage**: Bỏ StudentID và GradeClass khỏi features
 
-#### 2.2.1 Code minh hoạ: Làm sạch cơ bản
+#### 2.3.1 Code minh hoạ: Làm sạch cơ bản
 
 ```python
 # Làm tròn các biến số để giảm nhiễu
@@ -137,7 +209,7 @@ df["GPA"] = df["GPA"].round(2)
 df["StudyTimeWeekly"] = df["StudyTimeWeekly"].round(2)
 ```
 
-#### 2.2.2 Code minh hoạ: Encoding categorical
+#### 2.3.2 Code minh hoạ: Encoding categorical
 
 Notebook sử dụng LabelEncoder cho một số biến phân loại. (Lưu ý: LabelEncoder phù hợp khi mô hình là tree-based; với linear model thường ưu tiên OneHot.)
 
@@ -150,7 +222,7 @@ for col in cat_columns:
   df[col] = le.fit_transform(df[col])
 ```
 
-#### 2.2.3 Code minh hoạ: Scaling numeric
+#### 2.3.3 Code minh hoạ: Scaling numeric
 
 ```python
 from sklearn.preprocessing import StandardScaler
@@ -160,7 +232,7 @@ scaler = StandardScaler()
 df[numeric_features] = scaler.fit_transform(df[numeric_features])
 ```
 
-#### 2.2.4 Tránh data leakage
+#### 2.3.4 Tránh data leakage
 
 ```python
 X = df.drop(columns=["Results", "StudentID", "GradeClass"])
@@ -168,10 +240,11 @@ y = df["Results"]
 ```
 
 **Lý do**:
+
 - `StudentID` chỉ là mã định danh (không mang ý nghĩa dự đoán).
 - `GradeClass` được dùng để tạo `Results` nên nếu dùng làm feature sẽ tạo vòng lặp (leakage) và làm mô hình “ảo” tốt.
 
-### 2.3 Random Forest & Hyperparameter Tuning
+### 2.4 Random Forest & Hyperparameter Tuning
 
 **Grid Search với 5-Fold Cross-Validation**:
 
@@ -185,7 +258,7 @@ y = df["Results"]
 - `max_depth`: 5
 - `max_features`: 'sqrt'
 
-#### 2.3.1 Code minh hoạ: Train/Test split
+#### 2.4.1 Code minh hoạ: Train/Test split
 
 Notebook đang dùng `random_state=42`, `test_size=0.2`. (Notebook không bật `stratify`, nên tỷ lệ Pass/Fail ở test set có thể chênh nhẹ.)
 
@@ -203,10 +276,11 @@ print(len(X_train), len(X_test))
 ```
 
 **Kết quả thực tế**:
+
 - Test size: 479 samples
 - Support trong classification report: Fail=71, Pass=408
 
-#### 2.3.2 Code minh hoạ: GridSearchCV
+#### 2.4.2 Code minh hoạ: GridSearchCV
 
 ```python
 from sklearn.ensemble import RandomForestClassifier
@@ -227,11 +301,12 @@ print(grid_search.best_params_)
 ```
 
 **Kết quả thực tế**:
+
 ```text
 {'max_depth': 5, 'max_features': 'sqrt', 'n_estimators': 50}
 ```
 
-### 2.4 Train-Test Split
+### 2.5 Train-Test Split
 
 - **Training set**: 80% (1,913 students)
 - **Test set**: 20% (479 students)
@@ -239,14 +314,14 @@ print(grid_search.best_params_)
 
 ---
 
-## 2.5 Khảo sát dữ liệu (EDA) và trực quan
+## 2.6 Khảo sát dữ liệu (EDA) và trực quan
 
 Phần EDA trong notebook tập trung vào 2 góc nhìn đơn giản nhưng hữu ích:
 
 1. Phân bố GPA (sau chuẩn hoá)
 2. Quan hệ giữa thời gian tự học và GPA
 
-### 2.5.1 Code minh hoạ: GPA distribution
+### 2.6.1 Code minh hoạ: GPA distribution
 
 ```python
 import matplotlib.pyplot as plt
@@ -263,10 +338,11 @@ plt.show()
 ![GPA Distribution](assets/gpa_distribution.png)
 
 **Diễn giải ngắn**:
+
 - Vì dữ liệu đã chuẩn hoá (StandardScaler), GPA nằm quanh khoảng ~[-2.5, 2.5].
 - Phân bố khá “mượt” và không có outlier quá cực đoan → phù hợp để mô hình học patterns ổn định.
 
-### 2.5.2 Code minh hoạ: StudyTime vs GPA
+### 2.6.2 Code minh hoạ: StudyTime vs GPA
 
 ```python
 plt.figure(figsize=(10, 6))
@@ -280,6 +356,7 @@ plt.show()
 ![Study Time vs GPA](assets/study_time_vs_gpa.png)
 
 **Diễn giải ngắn**:
+
 - Scatter plot cho thấy quan hệ không tuyến tính rõ ràng; có nhiễu lớn.
 - Điều này giải thích vì sao tree-based model (Random Forest) phù hợp hơn linear model.
 - StudyTime có ảnh hưởng (feature importance ~4.6%) nhưng không “đơn độc quyết định” kết quả.
@@ -315,6 +392,7 @@ print(classification_report(y_test, y_pred))
 ```
 
 **Giải thích nhanh**:
+
 - `Fail (0)` là lớp quan trọng nhất vì mục tiêu hệ thống là phát hiện sinh viên có nguy cơ trượt để can thiệp.
 - Recall(Fail)=0.83 nghĩa là bắt được 83% số sinh viên thực sự Fail trong test.
 
@@ -364,6 +442,7 @@ plt.show()
 ```
 
 **Lưu ý báo cáo**:
+
 - Nếu mục tiêu của trường là “không bỏ sót” (giảm FN=6), có thể:
   - hạ threshold quyết định (tăng recall Fail, giảm precision), hoặc
   - dùng class_weight='balanced', hoặc
@@ -427,6 +506,7 @@ print(importance_df)
 ```
 
 **Kết quả thực tế (top)**:
+
 - GPA: 0.635786
 - Absences: 0.252053
 - StudyTimeWeekly: 0.046013
@@ -446,6 +526,7 @@ print(importance_df)
 - FN=6 trong test set: vẫn có sinh viên trượt bị bỏ sót → cần quy trình “human-in-the-loop” (cố vấn/giảng viên bổ sung quan sát).
 
 **Khuyến nghị**:
+
 - Dùng mô hình như công cụ sàng lọc (screening), không dùng để “đóng dấu” sinh viên.
 - Tập trung can thiệp vào biến có thể thay đổi: Absences, StudyTimeWeekly, Tutoring.
 
@@ -522,6 +603,7 @@ pass_proba = best_model.predict_proba(X_test)[:, 1]
 #### 4.4.2 Gán nhãn Risk Tier theo ngưỡng
 
 Ngưỡng có thể điều chỉnh theo nguồn lực. Báo cáo này dùng ví dụ:
+
 - High risk: P(Pass) < 0.30
 - Medium risk: 0.30 ≤ P(Pass) ≤ 0.70
 - Low risk: P(Pass) > 0.70
@@ -557,6 +639,7 @@ print(priority_df[["P(Pass)", "RiskTier"]].head(10))
 ```
 
 **Gợi ý trình bày báo cáo**:
+
 - Tạo danh sách Top-N sinh viên High risk cho cố vấn học tập.
 - Với mỗi sinh viên, hiển thị 2–3 yếu tố nổi bật (ví dụ: Absences cao, StudyTimeWeekly thấp).
 
@@ -626,10 +709,12 @@ Nếu chưa có dashboard, bạn có thể export nhanh từ notebook bằng cá
 Dataset có 84.3% Pass và 15.7% Fail. Điều này có thể khiến mô hình “thiên” về dự đoán Pass nếu không kiểm soát.
 
 Trong kết quả hiện tại:
+
 - Mô hình vẫn bắt Fail khá tốt (Recall(Fail)=0.83)
 - Tuy nhiên, Fail support trong test chỉ 71 → nên đánh giá thêm bằng cross-validation theo lớp Fail hoặc confusion matrix theo từng lần split.
 
 **Gợi ý mở rộng (không bắt buộc)**:
+
 - Dùng `StratifiedKFold` để đảm bảo mỗi fold có tỷ lệ Fail tương tự.
 - Thử `class_weight='balanced'` trong RandomForestClassifier.
 
@@ -638,6 +723,7 @@ Trong kết quả hiện tại:
 Random Forest không bắt buộc scaling, nhưng notebook đang chuẩn hoá để đồng nhất pipeline.
 
 Điểm cần lưu ý:
+
 - Scaling không làm giảm chất lượng mô hình tree-based, nhưng có thể gây hiểu nhầm nếu người đọc nghĩ GPA là giá trị gốc.
 - Vì thế báo cáo đã ghi rõ: các biểu đồ EDA đang hiển thị giá trị sau chuẩn hoá.
 
@@ -690,16 +776,19 @@ Random Forest không bắt buộc scaling, nhưng notebook đang chuẩn hoá đ
 ### 5.4 Roadmap triển khai (gợi ý theo giai đoạn)
 
 **Giai đoạn 1 — Proof-of-Concept (2–4 tuần)**
+
 - Chạy notebook trên dữ liệu lịch sử
 - Xuất báo cáo chỉ số (accuracy, recall Fail, confusion matrix)
 - Thống nhất quy trình can thiệp tối thiểu (tutoring/điểm danh)
 
 **Giai đoạn 2 — Pilot (4–8 tuần)**
+
 - Áp dụng cho 1–2 lớp/môn
 - Review hàng tuần: danh sách High risk và phản hồi giáo viên
 - Ghi nhận tác động: số buổi vắng giảm? điểm tăng?
 
 **Giai đoạn 3 — Scale (1 học kỳ)**
+
 - Tích hợp vào hệ thống quản lý học tập
 - Chuẩn hoá dashboard
 - Thiết lập cơ chế retrain theo học kỳ
@@ -915,20 +1004,24 @@ Phần này mô tả cách đảm bảo người khác có thể chạy lại v�
 ## E1. Các yếu tố ảnh hưởng đến kết quả
 
 1. **Randomness**
-  - `random_state=42` được dùng trong train/test split và RandomForestClassifier.
-  - Nếu đổi seed, confusion matrix và classification report có thể thay đổi nhẹ.
+
+- `random_state=42` được dùng trong train/test split và RandomForestClassifier.
+- Nếu đổi seed, confusion matrix và classification report có thể thay đổi nhẹ.
 
 2. **Phiên bản thư viện**
-  - Các version của `scikit-learn`, `numpy`, `pandas` có thể làm thay đổi kết quả tuning.
-  - Khuyến nghị cố định version khi nộp bài.
+
+- Các version của `scikit-learn`, `numpy`, `pandas` có thể làm thay đổi kết quả tuning.
+- Khuyến nghị cố định version khi nộp bài.
 
 3. **Cách chia train/test**
-  - Notebook hiện tại không dùng `stratify=y`.
-  - Nếu bật stratify, tỉ lệ Fail/Pass ở test set ổn định hơn nhưng kết quả có thể khác.
+
+- Notebook hiện tại không dùng `stratify=y`.
+- Nếu bật stratify, tỉ lệ Fail/Pass ở test set ổn định hơn nhưng kết quả có thể khác.
 
 4. **Tiền xử lý**
-  - Encoding và scaling phải nhất quán giữa train và inference.
-  - Khi deploy, cần lưu encoder/scaler (hoặc pipeline) để dùng lại cho dữ liệu mới.
+
+- Encoding và scaling phải nhất quán giữa train và inference.
+- Khi deploy, cần lưu encoder/scaler (hoặc pipeline) để dùng lại cho dữ liệu mới.
 
 ## E2. Code minh hoạ: In phiên bản môi trường
 
@@ -985,6 +1078,7 @@ Bạn có thể dùng checklist này để đảm bảo báo cáo đủ nội du
 - [ ] **[GHI CHÚ: Chèn ảnh chụp màn hình output notebook vào đây nếu cần]**
 
 Ví dụ:
+
 ```markdown
 ![Output notebook - classification report](assets/notebook_output_classification_report.png)
 ```

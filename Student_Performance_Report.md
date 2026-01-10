@@ -59,7 +59,55 @@ Throughout, we maintain focus on the human element: this technology exists to se
 
 ## 2. Proposed Method
 
-### 2.1 Research Methodology
+### 2.1 Random Forest: Algorithm Overview and Theoretical Background
+
+#### 2.1.1 Core Idea of Random Forest
+
+Random Forest is an ensemble learning method that constructs a collection of decision trees and aggregates their predictions to obtain a final output. The central intuition follows a classical principle in algorithm design: combining multiple “weak” or high-variance predictors can yield a stronger predictor when their errors are not perfectly correlated. A single decision tree is expressive and can fit complex, non-linear decision boundaries, but it is also highly sensitive to perturbations in the training set—small changes in the input sample can produce substantially different trees. This instability is a hallmark of high variance.
+
+Ensemble learning addresses this by building multiple models under controlled randomness and aggregating them. In classification, aggregation is typically performed by majority voting; in regression, by averaging. When base learners are diverse, aggregation reduces variance through a form of error cancellation: individual trees may overreact to noise in different ways, but the ensemble smooths these idiosyncrasies. Random Forest operationalizes this idea by injecting randomness both at the level of data (bootstrap sampling) and at the level of feature selection (random subspaces), promoting diversity among trees and improving generalization.
+
+#### 2.1.2 Algorithm Structure
+
+A Random Forest consists of $T$ decision trees, each trained as an independent base learner. Each decision tree is a rooted structure in which internal nodes represent tests on features, edges represent outcomes of those tests, and leaves store predicted class labels (or class distributions). The tree induces a hierarchical partition of the feature space: each internal split divides the input space into two or more regions, and each region is recursively subdivided until a stopping criterion is met (e.g., maximum depth, minimum samples per leaf, or purity).
+
+Two structural mechanisms distinguish Random Forest from a simple collection of trees. First, during training, each split does not consider all $d$ available features. Instead, at each node, the algorithm samples a subset of size $k$ (often $k \approx \sqrt{d}$ for classification) and selects the best split only among those candidates according to an impurity criterion (e.g., Gini impurity or entropy). This random feature selection reduces the dominance of any single strong predictor across all trees, encouraging decorrelation between trees.
+
+Second, because trees are trained on bootstrapped samples rather than the full dataset, the resulting forest exhibits a natural form of redundancy: different trees capture different aspects of the underlying signal. Structurally, the forest is not a single combined graph; it is a multiset of tree structures whose outputs are aggregated at prediction time.
+
+#### 2.1.3 Training and Prediction Mechanism
+
+Random Forest training can be described as a sequence of conceptually simple steps:
+
+1. Draw $T$ bootstrap samples from the training set. Each bootstrap sample is formed by sampling $n$ instances with replacement from the original $n$ instances, so duplicates may appear and some original instances may be omitted.
+2. For each bootstrap sample, grow a decision tree using a greedy, top-down procedure. At each node, randomly select $k$ candidate features from the full feature set and choose the split (within the candidate set) that maximizes a local purity gain (equivalently, minimizes impurity).
+3. Stop tree growth according to predefined constraints (e.g., maximum depth, minimum leaf size, or no further impurity reduction). Notably, Random Forests often allow relatively deep trees because variance will be mitigated by aggregation.
+
+At prediction time, a query instance is routed through each tree from the root to a leaf by applying the feature tests along the path. Each tree outputs a class label (or a probability distribution over classes derived from leaf class frequencies). The forest then aggregates these outputs via majority voting for classification. Formally, if tree $t$ predicts class $\hat{y}^{(t)}$, the forest prediction is $\hat{y} = \arg\max_{c} \sum_{t=1}^{T} \mathbf{1}[\hat{y}^{(t)} = c]$. This aggregation is a key algorithmic step: it replaces the decision boundary of a single tree with an averaged decision rule that is typically smoother and less sensitive to noise.
+
+#### 2.1.4 Theoretical Properties
+
+From a DSA perspective, Random Forest analysis centers on computational complexity, memory requirements, and the bias–variance trade-off. Let $n$ be the number of training instances, $d$ the number of features, $T$ the number of trees, $k$ the number of candidate features considered per split, and $h$ the height (depth) of a tree. Training a single decision tree involves repeatedly selecting splits. If one models a split selection as scanning $k$ features and evaluating candidate thresholds, the per-node cost is roughly proportional to the number of samples reaching that node times $k$ (with additional factors depending on how thresholds are enumerated). Under common assumptions (balanced growth and efficient threshold evaluation), a useful coarse bound for one tree is $O(n \cdot k \cdot \log n)$; worst-case behavior can approach $O(n^2 \cdot k)$ if the tree becomes highly unbalanced or split evaluation is naive. Consequently, training a forest is approximately $O(T \cdot n \cdot k \cdot \log n)$ in typical settings.
+
+Prediction time for one instance is $O(T \cdot h)$, since each tree performs a root-to-leaf traversal with constant work per node test. The space complexity is dominated by storing the forest structure: the number of nodes per tree is $O(2^h)$ in the worst case and $O(n)$ under common stopping constraints, yielding approximately $O(T \cdot n)$ storage in many practical regimes.
+
+The bias–variance profile explains why Random Forest often generalizes well. A single deep tree tends to have low bias and high variance; bagging reduces variance by averaging across bootstrapped models. Random feature selection further reduces correlation between trees, improving variance reduction beyond bagging alone. This combination yields robustness to noise and a reduced tendency to overfit compared to an unconstrained single tree, particularly when the underlying signal is complex and non-linear.
+
+#### 2.1.5 Design Paradigm
+
+Random Forest exemplifies the ensemble learning paradigm, specifically bagging (Bootstrap Aggregating). Bagging can be viewed as a variance-reduction strategy: it constructs multiple predictors from resampled datasets and aggregates them to stabilize predictions. In algorithmic terms, it leverages randomized sampling to generate multiple “views” of the same learning problem, then applies an aggregation operator that is computationally inexpensive relative to training.
+
+The method also relates conceptually to divide-and-conquer. A decision tree recursively partitions the input space into subproblems (regions) and assigns a prediction to each region; this resembles a top-down divide step followed by a constant-time conquer step at leaves. Random Forest extends this paradigm by performing many such recursive partitions under different randomized choices and then combining their outputs. The aggregation step plays a role analogous to combining subproblem solutions: instead of merging structures into one, it merges decisions at query time via voting. This viewpoint highlights Random Forest as an algorithmic composition of (i) randomized decomposition (bootstrapping and random subspaces) and (ii) deterministic combination (voting), a pattern common in randomized algorithms designed to improve stability and performance.
+
+#### 2.1.6 Comparison with Alternative Algorithms
+
+Compared with Logistic Regression, Random Forest does not assume linear separability or a log-odds model; Logistic Regression is efficient and interpretable but can underfit when the decision boundary is highly non-linear or when feature interactions are important. Compared with Support Vector Machines (SVMs), Random Forest often requires less careful feature scaling and kernel selection; SVMs can achieve strong performance with appropriate kernels, but may be sensitive to hyperparameter choices and can be computationally demanding for large datasets depending on the solver and kernel.
+
+Compared with $k$-Nearest Neighbors (kNN), Random Forest typically provides faster prediction when $T$ and $h$ are moderate: kNN requires distance computations to many (or all) training instances at query time, whereas a forest performs $O(T \cdot h)$ node tests. kNN is also sensitive to feature scaling and the curse of dimensionality, while Random Forest mitigates this through axis-aligned splits and random subspaces.
+
+Finally, compared with a single Decision Tree, Random Forest retains the ability to model non-linear relationships while substantially improving stability and resistance to overfitting through aggregation. For educational data in general—often noisy, heterogeneous, and driven by complex interactions—these properties are particularly valuable: the model can capture non-linear effects and interactions without requiring explicit feature engineering, while the ensemble structure reduces sensitivity to outliers and sampling variability.
+
+### 2.2 Research Methodology
 
 #### The Big Picture
 
@@ -182,7 +230,7 @@ Imagine asking one person to predict student success—their judgment might be g
 
 ✓ **Robust to noise**: Educational data is messy; Random Forest handles imperfect data well
 
-### 2.2 Design Algorithm
+### 2.3 Design Algorithm
 
 #### Finding the Best Configuration
 
