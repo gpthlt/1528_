@@ -848,6 +848,34 @@ Machine learning trong giáo dục không phải về thay thế con người b�
 
 ---
 
+## Tài liệu tham khảo (APA)
+
+Baker, R. S. J. d., & Yacef, K. (2009). The state of educational data mining in 2009: A review and future visions. *Journal of Educational Data Mining, 1*(1), 3–17.
+
+Breiman, L. (1996). Bagging predictors. *Machine Learning, 24*(2), 123–140.
+
+Breiman, L. (2001). Random forests. *Machine Learning, 45*(1), 5–32.
+
+Breiman, L., Friedman, J. H., Olshen, R. A., & Stone, C. J. (1984). *Classification and regression trees*. Wadsworth.
+
+Cortes, C., & Vapnik, V. (1995). Support-vector networks. *Machine Learning, 20*(3), 273–297.
+
+Cover, T. M., & Hart, P. E. (1967). Nearest neighbor pattern classification. *IEEE Transactions on Information Theory, 13*(1), 21–27.
+
+Fawcett, T. (2006). An introduction to ROC analysis. *Pattern Recognition Letters, 27*(8), 861–874.
+
+Hastie, T., Tibshirani, R., & Friedman, J. (2009). *The elements of statistical learning: Data mining, inference, and prediction* (2nd ed.). Springer.
+
+Hosmer, D. W., Lemeshow, S., & Sturdivant, R. X. (2013). *Applied logistic regression* (3rd ed.). Wiley.
+
+James, G., Witten, D., Hastie, T., & Tibshirani, R. (2021). *An introduction to statistical learning: With applications in R* (2nd ed.). Springer.
+
+Kohavi, R. (1995). A study of cross-validation and bootstrap for accuracy estimation and model selection. In C. S. Mellish (Ed.), *Proceedings of the 14th International Joint Conference on Artificial Intelligence (IJCAI)* (pp. 1137–1143). Morgan Kaufmann.
+
+Quinlan, J. R. (1986). Induction of decision trees. *Machine Learning, 1*(1), 81–106.
+
+Romero, C., & Ventura, S. (2010). Educational data mining: A review of the state of the art. *IEEE Transactions on Systems, Man, and Cybernetics, Part C (Applications and Reviews), 40*(6), 601–618.
+
 # PHỤ LỤC A — Hướng dẫn chèn hình và tái tạo hình ảnh
 
 Báo cáo này đã chèn ảnh bằng đường dẫn tương đối trong repo:
